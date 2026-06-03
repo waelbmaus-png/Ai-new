@@ -167,7 +167,7 @@ export async function POST(request: NextRequest) {
             })
             .eq("id", article.id);
 
-          await logArticleHistory(article.id, "failed", "enrichment_error", null, errorMsg);
+          await logArticleHistory(article.id, "failed", "enrichment_error", undefined, errorMsg);
 
           errors.push(`Article ${article.id}: ${errorMsg}`);
         }

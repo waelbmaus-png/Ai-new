@@ -55,10 +55,7 @@ export async function saveRawArticles(
         published_at: article.publishedAt?.toISOString(),
         source_guid: article.sourceGuid,
       }))
-    )
-    .on("error", (error) => {
-      console.error("[v0] Error saving raw articles:", error);
-    });
+    );
 
   if (error) {
     console.error("[v0] Error saving raw articles:", error);
