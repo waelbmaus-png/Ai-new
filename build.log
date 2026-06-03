@@ -1,0 +1,38 @@
+
+> my-project@0.1.0 build /vercel/share/v0-project
+> next build
+
+Attention: Next.js now collects completely anonymous telemetry regarding usage.
+This information is used to shape Next.js' roadmap and prioritize features.
+You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
+https://nextjs.org/telemetry
+
+▲ Next.js 16.2.6 (Turbopack)
+
+  Creating an optimized production build ...
+
+> Build error occurred
+Error: Turbopack build failed with 1 errors:
+./node_modules/.pnpm/feed-parser@1.0.19/node_modules/feed-parser/index.js:3:19
+Module not found: Can't resolve 'request'
+  [90m1 |[0m exports.parse = [36mfunction[0m(feedUrl, callback) {
+  [90m2 |[0m     [36mconst[0m [33mFeedParser[0m = require([32m'feedparser'[0m),
+[31m[1m>[0m [90m3 |[0m         request = require([32m'request'[0m);
+  [90m  |[0m                   [31m[1m^^^^^^^^^^^^^^^^^^[0m
+  [90m4 |[0m
+  [90m5 |[0m     [36mif[0m (feedUrl === [36mnull[0m || feedUrl === [32m''[0m) {
+  [90m6 |[0m         [36mthrow[0m [36mnew[0m [33mError[0m([32m'Invalid Feed URL. Exiting.'[0m);
+
+
+
+Import trace:
+  App Route:
+    ./node_modules/.pnpm/feed-parser@1.0.19/node_modules/feed-parser/index.js
+    ./lib/services/rss-fetcher.ts
+    ./app/api/cron/fetch-feeds/route.ts
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+ ELIFECYCLE  Command failed with exit code 1.
