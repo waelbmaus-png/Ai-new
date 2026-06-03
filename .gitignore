@@ -5,6 +5,9 @@ __v0_jsx-dev-runtime.ts
 .snowflake/
 .v0-trash/
 .vercel/
+# But allow inject-built-with-v0.mjs which is needed for Vercel builds
+!.v0/
+!.v0/inject-built-with-v0.mjs
 
 # Environment variables
 .env*.local
