@@ -14,6 +14,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Switch } from '@/components/ui/switch';
 
 interface Feed {
   id: string;
@@ -37,6 +47,7 @@ export default function FeedsManager() {
     refreshIntervalHours: 4,
   });
   const [isOpen, setIsOpen] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchFeeds();
@@ -74,11 +85,36 @@ export default function FeedsManager() {
   };
 
   const handleDeleteFeed = async (id: string) => {
-    if (!confirm('Delete this RSS feed?')) return;
     try {
       const response = await fetch(`/api/feeds/${id}`, { method: 'DELETE' });
-      if (!response.ok) throw new Error('Failed to delete feed');
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to delete feed');
+      }
+      
       setFeeds(feeds.filter((f) => f.id !== id));
+      setDeleteConfirmId(null);
+    } catch (err) {
+      alert(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    }
+  };
+
+  const handleToggleActive = async (id: string, currentStatus: boolean) => {
+    try {
+      const response = await fetch('/api/feeds', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id,
+          active: !currentStatus,
+        }),
+      });
+      if (!response.ok) throw new Error('Failed to update feed');
+      
+      setFeeds(feeds.map((f) =>
+        f.id === id ? { ...f, active: !currentStatus } : f
+      ));
     } catch (err) {
       alert(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
@@ -187,15 +223,25 @@ export default function FeedsManager() {
                 className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50"
               >
                 <div className="flex-1">
-                  <h3 className="font-medium">{feed.name}</h3>
-                  <p className="text-sm text-gray-600 truncate">{feed.url}</p>
-                  <div className="flex gap-2 mt-2">
+                  <div className="flex items-center gap-3">
+                    <h3 className="font-medium">{feed.name}</h3>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-gray-600">
+                        {feed.active ? 'Active' : 'Inactive'}
+                      </span>
+                      <Switch
+                        checked={feed.active}
+                        onCheckedChange={() =>
+                          handleToggleActive(feed.id, feed.active)
+                        }
+                      />
+                    </div>
+                  </div>
+                  <p className="text-sm text-gray-600 truncate mt-1">{feed.url}</p>
+                  <div className="flex gap-2 mt-2 flex-wrap">
                     {feed.category && (
                       <Badge variant="outline">{feed.category}</Badge>
                     )}
-                    <Badge variant={feed.active ? 'default' : 'secondary'}>
-                      {feed.active ? 'Active' : 'Inactive'}
-                    </Badge>
                     {feed.last_fetched_at && (
                       <span className="text-xs text-gray-600">
                         Last fetched:{' '}
@@ -206,11 +252,37 @@ export default function FeedsManager() {
                 </div>
                 <Button
                   size="sm"
-                  variant="outline"
-                  onClick={() => handleDeleteFeed(feed.id)}
+                  variant="destructive"
+                  onClick={() => setDeleteConfirmId(feed.id)}
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
+
+                <AlertDialog
+                  open={deleteConfirmId === feed.id}
+                  onOpenChange={(open) =>
+                    setDeleteConfirmId(open ? feed.id : null)
+                  }
+                >
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Delete Feed</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Are you sure you want to delete &quot;{feed.name}&quot;?
+                        This action cannot be undone.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <div className="flex gap-3">
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => handleDeleteFeed(feed.id)}
+                        className="bg-red-600 hover:bg-red-700"
+                      >
+                        Delete
+                      </AlertDialogAction>
+                    </div>
+                  </AlertDialogContent>
+                </AlertDialog>
               </div>
             ))}
           </div>
