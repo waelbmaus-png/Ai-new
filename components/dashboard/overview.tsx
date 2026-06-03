@@ -5,12 +5,18 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { AlertCircle, CheckCircle, Clock, Rss, FileText } from 'lucide-react';
 
 interface DashboardStats {
+  pipeline: {
+    rawArticles: number;
+    processedArticles: number;
+    publishedArticles: number;
+  };
   stats: {
     totalArticles: number;
     publishedArticles: number;
     draftArticles: number;
     pendingArticles: number;
     totalFeeds: number;
+    activeFeeds: number;
   };
   statusCounts: Record<string, number>;
   recentCrons: any[];
@@ -44,10 +50,45 @@ export default function DashboardOverview() {
   if (error) return <div className="text-red-600 py-8">Error: {error}</div>;
   if (!stats) return null;
 
-  const { stats: data, statusCounts, recentCrons } = stats;
+  const { pipeline, stats: data, statusCounts, recentCrons } = stats;
 
   return (
     <div className="grid gap-4">
+      {/* Pipeline Statistics */}
+      <Card className="border-blue-200 bg-blue-50">
+        <CardHeader>
+          <CardTitle className="text-lg">Processing Pipeline</CardTitle>
+          <CardDescription>Data flow from feeds through to publication</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="flex flex-col items-center p-4 bg-white rounded-lg border">
+              <p className="text-sm text-gray-600 mb-1">Raw Articles</p>
+              <p className="text-3xl font-bold text-blue-600">{pipeline.rawArticles}</p>
+              <p className="text-xs text-gray-500 mt-1">From RSS feeds</p>
+            </div>
+            <div className="flex flex-col items-center justify-center">
+              <div className="text-gray-400 text-2xl mb-2">→</div>
+              <p className="text-xs text-gray-500">Deduplication</p>
+            </div>
+            <div className="flex flex-col items-center p-4 bg-white rounded-lg border">
+              <p className="text-sm text-gray-600 mb-1">Processed Articles</p>
+              <p className="text-3xl font-bold text-green-600">{pipeline.processedArticles}</p>
+              <p className="text-xs text-gray-500 mt-1">Unique, enriched</p>
+            </div>
+            <div className="flex flex-col items-center justify-center md:col-start-2">
+              <div className="text-gray-400 text-2xl mb-2">→</div>
+              <p className="text-xs text-gray-500">Enrichment & Publish</p>
+            </div>
+            <div className="flex flex-col items-center p-4 bg-white rounded-lg border">
+              <p className="text-sm text-gray-600 mb-1">Published Articles</p>
+              <p className="text-3xl font-bold text-purple-600">{pipeline.publishedArticles}</p>
+              <p className="text-xs text-gray-500 mt-1">Live on Blogger</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Key Metrics */}
       <div className="grid gap-4 md:grid-cols-5">
         <Card>
@@ -100,8 +141,8 @@ export default function DashboardOverview() {
             <Rss className="h-4 w-4 text-purple-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{data.totalFeeds}</div>
-            <p className="text-xs text-gray-600">Active feeds</p>
+            <div className="text-2xl font-bold">{data.activeFeeds}/{data.totalFeeds}</div>
+            <p className="text-xs text-gray-600">Active/Total feeds</p>
           </CardContent>
         </Card>
       </div>
