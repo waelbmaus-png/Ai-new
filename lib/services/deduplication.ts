@@ -127,7 +127,7 @@ async function checkContentDuplicates(
   const { data: recentArticles } = await supabase
     .from("articles")
     .select("id, content")
-    .is("content", "not.is", null)
+    .not("content", "is", null)
     .order("created_at", { ascending: false })
     .limit(50);
 
