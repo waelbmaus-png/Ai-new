@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { AlertCircle, CheckCircle, Clock, Rss, FileText } from 'lucide-react';
+import PipelineControls from './pipeline-controls';
 
 interface DashboardStats {
   pipeline: {
@@ -220,6 +221,9 @@ export default function DashboardOverview() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Pipeline Controls */}
+      <PipelineControls />
     </div>
   );
 }
