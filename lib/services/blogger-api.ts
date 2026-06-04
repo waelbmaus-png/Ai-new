@@ -52,19 +52,25 @@ async function getAccessToken(): Promise<string> {
   // In a real implementation, this would refresh the OAuth token using the refresh token
   // For now, we'll return the stored token
   const apiKey = await getConfig("blogger_api_key");
+  console.log(`[v0] Blogger API: Retrieved access token (length: ${apiKey?.length || 0})`);
   return apiKey;
 }
 
 export async function createBloggerPost(
   post: CreatePostRequest
-): Promise<{ postId: string; url: string } | null> {
+): Promise<{ postId: string; url: string; error?: string } | null> {
   try {
+    console.log(`[v0] createBloggerPost: Starting post creation. Title: "${post.title}", isDraft: ${post.isDraft}`);
+    
     const accessToken = await getAccessToken();
     const blogId = await getConfig("blogger_blog_id");
 
+    console.log(`[v0] Blogger credentials check - BlogId: ${blogId ? "✓" : "✗"}, Token: ${accessToken ? "✓" : "✗"}`);
+
     if (!accessToken || !blogId) {
-      console.error("[v0] Missing Blogger credentials");
-      return null;
+      const error = `Missing Blogger credentials: blogId=${!!blogId}, token=${!!accessToken}`;
+      console.error(`[v0] ${error}`);
+      return { postId: "", url: "", error };
     }
 
     // Format content with HTML
@@ -85,6 +91,8 @@ export async function createBloggerPost(
       draft: post.isDraft,
     };
 
+    console.log(`[v0] createBloggerPost: Sending POST request to Blogger API. Post title: "${post.title}"`);
+    
     const response = await fetch(
       `https://www.googleapis.com/blogger/v3/blogs/${blogId}/posts?access_token=${accessToken}`,
       {
@@ -96,24 +104,26 @@ export async function createBloggerPost(
       }
     );
 
+    console.log(`[v0] createBloggerPost: Response status: ${response.status}`);
+
     if (!response.ok) {
       const error = await response.json();
-      console.error(
-        "[v0] Error creating Blogger post:",
-        error
-      );
-      return null;
+      const errorMsg = `Blogger API error (${response.status}): ${JSON.stringify(error)}`;
+      console.error(`[v0] ${errorMsg}`);
+      return { postId: "", url: "", error: errorMsg };
     }
 
     const created = (await response.json()) as BloggerPost;
+    console.log(`[v0] createBloggerPost: SUCCESS. PostId: ${created.id}, URL: ${created.url}`);
 
     return {
       postId: created.id,
       url: created.url,
     };
   } catch (error) {
-    console.error("[v0] Error creating Blogger post:", error);
-    return null;
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    console.error(`[v0] createBloggerPost: EXCEPTION - ${errorMsg}`);
+    return { postId: "", url: "", error: errorMsg };
   }
 }
 
