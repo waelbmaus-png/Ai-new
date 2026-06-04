@@ -6,23 +6,30 @@ export async function GET(request: NextRequest) {
     const supabase = await createClient();
 
     // Get all table counts
-    const [
-      { count: rawArticlesCount },
-      { count: articlesCount },
-      { count: deduplicationRecordsCount },
-      { count: publishedArticlesCount },
-      { count: feedsCount },
-      { count: activeFeeds },
-      { count: cronLogsCount },
-    ] = await Promise.all([
+    const results = await Promise.allSettled([
       supabase.from("raw_articles").select("id", { count: "exact" }),
       supabase.from("articles").select("id", { count: "exact" }),
       supabase.from("deduplication_records").select("id", { count: "exact" }),
-      supabase.from("published_articles").select("id", { count: "exact" }).catch(() => ({ count: 0 })),
+      supabase.from("published_articles").select("id", { count: "exact" }),
       supabase.from("rss_feeds").select("id", { count: "exact" }),
       supabase.from("rss_feeds").select("id", { count: "exact" }).eq("active", true),
       supabase.from("cron_logs").select("id", { count: "exact" }),
     ]);
+
+    const extractCount = (result: PromiseSettledResult<any>): number => {
+      if (result.status === "fulfilled" && result.value?.count !== undefined) {
+        return result.value.count;
+      }
+      return 0;
+    };
+
+    const rawArticlesCount = extractCount(results[0]);
+    const articlesCount = extractCount(results[1]);
+    const dedupCount = extractCount(results[2]);
+    const publishedCount = extractCount(results[3]);
+    const feedsCount = extractCount(results[4]);
+    const activeFeeds = extractCount(results[5]);
+    const cronLogsCount = extractCount(results[6]);
 
     // Get sample raw article
     const { data: sampleRawArticle } = await supabase
@@ -65,16 +72,21 @@ export async function GET(request: NextRequest) {
       .limit(10);
 
     // Get table schema info
-    const { data: tableInfo } = await supabase
-      .rpc("information_schema.tables", {})
-      .catch(() => ({ data: null }));
+    let tableInfo = null;
+    try {
+      const { data } = await supabase
+        .rpc("information_schema.tables", {});
+      tableInfo = data;
+    } catch (err) {
+      // Table schema info not available
+    }
 
     return NextResponse.json({
       pipeline: {
         raw_articles: rawArticlesCount || 0,
         articles: articlesCount || 0,
-        deduplication_records: deduplicationRecordsCount || 0,
-        published_articles: publishedArticlesCount || 0,
+        deduplication_records: dedupCount || 0,
+        published_articles: publishedCount || 0,
       },
       feeds: {
         total: feedsCount || 0,
