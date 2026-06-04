@@ -5,6 +5,11 @@ export async function GET() {
   try {
     const supabase = await createClient();
 
+    // Get raw articles (from feeds)
+    const { count: rawArticles } = await supabase
+      .from("raw_articles")
+      .select("id", { count: "exact" });
+
     // Get total articles
     const { count: totalArticles } = await supabase
       .from("articles")
@@ -34,6 +39,12 @@ export async function GET() {
       .from("rss_feeds")
       .select("id", { count: "exact" });
 
+    // Get active feeds
+    const { count: activeFeeds } = await supabase
+      .from("rss_feeds")
+      .select("id", { count: "exact" })
+      .eq("active", true);
+
     // Get recent cron job status
     const { data: recentCrons } = await supabase
       .from("cron_logs")
@@ -62,12 +73,18 @@ export async function GET() {
     });
 
     return NextResponse.json({
+      pipeline: {
+        rawArticles: rawArticles || 0,
+        processedArticles: totalArticles || 0,
+        publishedArticles: publishedArticles || 0,
+      },
       stats: {
         totalArticles: totalArticles || 0,
         publishedArticles: publishedArticles || 0,
         draftArticles: draftArticles || 0,
         pendingArticles: pendingArticles || 0,
         totalFeeds: totalFeeds || 0,
+        activeFeeds: activeFeeds || 0,
       },
       statusCounts,
       recentCrons: recentCrons || [],
