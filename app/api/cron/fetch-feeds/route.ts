@@ -4,6 +4,10 @@ import { logCronJob } from "@/lib/services/history-logger";
 
 export const maxDuration = 300; // 5 minutes
 
+export async function GET(request: NextRequest) {
+  return POST(request);
+}
+
 export async function POST(request: NextRequest) {
   try {
     // Verify Vercel Cron secret if set

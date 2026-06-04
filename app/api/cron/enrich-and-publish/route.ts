@@ -16,6 +16,10 @@ import {
 
 export const maxDuration = 300;
 
+export async function GET(request: NextRequest) {
+  return POST(request);
+}
+
 export async function POST(request: NextRequest) {
   try {
     const cronSecret = process.env.CRON_SECRET;
@@ -33,6 +37,21 @@ export async function POST(request: NextRequest) {
 
     const supabase = await createClient();
 
+    // Count total articles
+    const { count: totalArticles } = await supabase
+      .from("articles")
+      .select("id", { count: "exact" });
+
+    console.log(`[v0] Total articles in database: ${totalArticles}`);
+
+    // Count articles by status
+    const { count: enrichedCount } = await supabase
+      .from("articles")
+      .select("id", { count: "exact" })
+      .eq("status", "enriched");
+
+    console.log(`[v0] Articles with status="enriched": ${enrichedCount}`);
+
     // Get articles ready for enrichment (status = "enriched" but no meta_description yet)
     const { data: enrichedArticles, error: fetchError } = await supabase
       .from("articles")
@@ -42,12 +61,13 @@ export async function POST(request: NextRequest) {
       .limit(50);
 
     if (fetchError) {
+      console.error("[v0] ERROR fetching articles:", fetchError);
       throw new Error(`Failed to fetch articles: ${fetchError.message}`);
     }
 
-    console.log(`[v0] Found ${enrichedArticles?.length || 0} articles for enrichment`);
+    console.log(`[v0] Found ${enrichedArticles?.length || 0} articles for enrichment (no meta_description yet)`);
 
-    let enrichedCount = 0;
+    let enrichedProcessedCount = 0;
     let publishedCount = 0;
     const errors: string[] = [];
 
@@ -66,7 +86,7 @@ export async function POST(request: NextRequest) {
           }
 
           // Update article with enriched data
-          await supabase
+          const { error: updateError } = await supabase
             .from("articles")
             .update({
               meta_description: enriched.metaDescription,
@@ -76,12 +96,19 @@ export async function POST(request: NextRequest) {
             })
             .eq("id", article.id);
 
+          if (updateError) {
+            console.error(`[v0] ERROR updating article ${article.id} with enrichment data: ${updateError.message}`);
+            throw updateError;
+          }
+
+          console.log(`[v0] Successfully updated article ${article.id} with enrichment data`);
+
           await logArticleHistory(article.id, "enriched", "success", {
             metaDescription: enriched.metaDescription,
             labelsCount: enriched.labels.length,
           });
 
-          enrichedCount++;
+          enrichedProcessedCount++;
 
           // Check if auto-publish is enabled
           const { data: config } = await supabase
@@ -175,23 +202,23 @@ export async function POST(request: NextRequest) {
     }
 
     await logCronJob("enrich-and-publish", "success", {
-      articlesProcessed: enrichedCount,
+      articlesProcessed: enrichedProcessedCount,
       articlesPublished: publishedCount,
       errorMessage: errors.length > 0 ? errors.join("; ") : undefined,
       details: {
-        enrichedCount,
+        enrichedProcessedCount,
         publishedCount,
         errorsCount: errors.length,
       },
     });
 
     console.log(
-      `[v0] Enrichment completed. Enriched: ${enrichedCount}, Published: ${publishedCount}`
+      `[v0] Enrichment completed. Enriched: ${enrichedProcessedCount}, Published: ${publishedCount}`
     );
 
     return NextResponse.json({
       success: true,
-      enrichedCount,
+      enrichedProcessedCount,
       publishedCount,
       errors: errors.length > 0 ? errors : undefined,
     });
