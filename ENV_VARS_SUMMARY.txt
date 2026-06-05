@@ -1,0 +1,277 @@
+================================================================================
+  AI NEWS AUTOMATION SYSTEM - ENVIRONMENT VARIABLES SUMMARY
+================================================================================
+
+PROJECT SETUP FINDINGS:
+├── OAuth Type: Direct Google OAuth2 (NO NextAuth.js)
+├── Database: Supabase PostgreSQL
+├── Deployment: Vercel
+├── Authentication: API keys + OAuth tokens
+└── Callback Routes: NONE REQUIRED ✓
+
+================================================================================
+PART 1: VERCEL ENVIRONMENT VARIABLES (6 Required)
+================================================================================
+
+Add to: Vercel Dashboard → Settings → Environment Variables
+
+1. NEXT_PUBLIC_SUPABASE_URL [PUBLIC]
+   └─ Source: Supabase Dashboard → Settings → API
+   └─ Example: https://hiqityhnahldwzjzjiur.supabase.co
+   └─ Used by: Client-side Supabase initialization (lib/supabase/client.ts)
+
+2. NEXT_PUBLIC_SUPABASE_ANON_KEY [PUBLIC]
+   └─ Source: Supabase Dashboard → Settings → API  
+   └─ Example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+   └─ Used by: Read-only Supabase access via RLS (safe, public)
+
+3. OPENROUTER_API_KEY [SECRET]
+   └─ Source: OpenRouter Dashboard
+   └─ Example: sk-or-v1-abc123def456...
+   └─ Used by: AI content enrichment (lib/services/ai-enrichment.ts)
+
+4. CRON_SECRET [SECRET]
+   └─ Source: Create your own strong random token
+   └─ Example: your-super-secret-token-1a2b3c4d5e6f7g8h
+   └─ Used by: Protect cron endpoints (app/api/cron/*)
+
+5. NEXT_PUBLIC_BASE_URL [PUBLIC]
+   └─ Source: Your Vercel deployment domain
+   └─ Example: https://ai-news-automation.vercel.app
+   └─ Used by: Dashboard cron configuration display
+
+6. NEXT_PUBLIC_CRON_SECRET [PUBLIC]
+   └─ Source: Same value as CRON_SECRET above
+   └─ Example: your-super-secret-token-1a2b3c4d5e6f7g8h
+   └─ Used by: Client-side cron authorization headers
+
+================================================================================
+PART 2: DATABASE CONFIGURATION (6 Required)
+================================================================================
+
+Store in: Supabase → SQL Editor or Dashboard
+
+Table: system_config
+
+1. blogger_blog_id
+   └─ Type: String
+   └─ Source: Your Blogger blog URL (https://www.blogger.com/blog/posts/BLOG_ID)
+   └─ Example: "1234567890"
+   └─ Used by: Identify target blog for publishing (lib/services/blogger-api.ts)
+
+2. blogger_api_key
+   └─ Type: String (OAuth2 Access Token)
+   └─ Source: Google OAuth Playground or manual auth flow
+   └─ Example: "ya29.a0AfH6SMBx..."
+   └─ Used by: Authenticate Blogger API requests (lib/services/blogger-api.ts)
+
+3. openrouter_api_key
+   └─ Type: String (optional backup)
+   └─ Source: OpenRouter Dashboard
+   └─ Used by: Fallback AI enrichment if env var not set
+
+4. similarity_threshold
+   └─ Type: Number (float 0-1)
+   └─ Default: "0.75"
+   └─ Used by: Content deduplication threshold (lib/services/deduplication.ts)
+
+5. auto_publish_drafts
+   └─ Type: Boolean ("true" or "false")
+   └─ Default: "false"
+   └─ Used by: Auto-publish to Blogger or create drafts (app/api/cron/enrich-and-publish/route.ts)
+
+6. ai_model
+   └─ Type: String
+   └─ Default: "openrouter/auto"
+   └─ Used by: Select AI model for enrichment
+
+================================================================================
+PART 3: OAUTH2 ARCHITECTURE
+================================================================================
+
+Current Implementation: ✓ Direct Token Storage (NO Callback Route)
+
+Google OAuth2 Flow:
+┌─────────────────────────────────────────────────────────┐
+│ User manually gets OAuth2 access token                  │
+│ (via Google Cloud Console + OAuth Playground)           │
+└─────────────────┬───────────────────────────────────────┘
+                  ↓
+┌─────────────────────────────────────────────────────────┐
+│ Store access token in:                                  │
+│ Supabase → system_config → blogger_api_key              │
+└─────────────────┬───────────────────────────────────────┘
+                  ↓
+┌─────────────────────────────────────────────────────────┐
+│ API calls use stored token directly:                    │
+│ fetch('https://www.googleapis.com/blogger/v3/...',      │
+│   {headers: {Authorization: `Bearer ${token}`}})        │
+└─────────────────┬───────────────────────────────────────┘
+                  ↓
+┌─────────────────────────────────────────────────────────┐
+│ Create/Publish posts to Blogger                         │
+└─────────────────────────────────────────────────────────┘
+
+Redirect URI Status: NOT USED ✓
+└─ Why? Manual token storage eliminates need for OAuth callback
+└─ No /api/oauth/callback route required
+└─ No /auth/callback route required
+└─ Simpler deployment, fewer moving parts
+
+================================================================================
+PART 4: HOW TO GET BLOGGER ACCESS TOKEN
+================================================================================
+
+Step 1: Google Cloud Setup
+  └─ Go to: https://console.cloud.google.com
+  └─ Create new project
+  └─ Search for "Blogger API" → Enable
+  └─ Go to Credentials → Create OAuth 2.0 (Desktop app)
+  └─ Save: GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET
+
+Step 2: Get Authorization Code
+  └─ Go to: https://developers.google.com/oauthplayground
+  └─ Step 1: Select scope "Blogger API v3"
+  └─ Step 1: Select "https://www.googleapis.com/auth/blogger"
+  └─ Step 2: Exchange auth code → Copy "Authorization code"
+
+Step 3: Exchange for Access Token
+  └─ Run this curl command:
+     curl -X POST https://oauth2.googleapis.com/token \
+       -d "client_id=YOUR_CLIENT_ID" \
+       -d "client_secret=YOUR_CLIENT_SECRET" \
+       -d "code=AUTHORIZATION_CODE" \
+       -d "grant_type=authorization_code" \
+       -d "redirect_uri=urn:ietf:wg:oauth:2.0:oob"
+
+  └─ Response will include:
+     {
+       "access_token": "ya29.a0AfH6SMBxyz...",
+       "expires_in": 3599,
+       "refresh_token": "1//xxxxx...",
+       "token_type": "Bearer"
+     }
+
+Step 4: Store in Database
+  └─ Copy the "access_token" value
+  └─ Go to Supabase Dashboard
+  └─ SQL Editor → Update system_config:
+     UPDATE system_config 
+     SET config_value = 'ya29.a0AfH6SMBxyz...'
+     WHERE config_key = 'blogger_api_key';
+
+================================================================================
+PART 5: VERIFICATION CHECKLIST
+================================================================================
+
+Pre-Deployment Verification:
+
+Environment Variables (Vercel):
+  ☐ NEXT_PUBLIC_SUPABASE_URL = https://xxxxx.supabase.co
+  ☐ NEXT_PUBLIC_SUPABASE_ANON_KEY = eyJhbGc...
+  ☐ OPENROUTER_API_KEY = sk-or-v1-...
+  ☐ CRON_SECRET = strong random token
+  ☐ NEXT_PUBLIC_BASE_URL = your deployed domain
+  ☐ NEXT_PUBLIC_CRON_SECRET = same as CRON_SECRET
+
+Database Configuration (Supabase):
+  ☐ blogger_blog_id = your blog ID number
+  ☐ blogger_api_key = valid access token (ya29...)
+  ☐ similarity_threshold = 0.75 (or preferred value)
+  ☐ auto_publish_drafts = true or false
+  ☐ ai_model = openrouter/auto
+  ☐ openrouter_api_key = set (optional)
+
+Testing:
+  ☐ Run: GET /api/debug/blogger-test
+     Expected: Successfully creates test post
+  ☐ Run: GET /api/debug/pipeline-status
+     Expected: Shows article counts and pipeline status
+  ☐ Check Dashboard → Logs
+     Expected: Recent cron job executions
+
+================================================================================
+QUICK SETUP GUIDE
+================================================================================
+
+1. Create Vercel Environment Variables:
+   Copy-paste each variable into Vercel dashboard
+
+2. Get Blogger Blog ID:
+   https://www.blogger.com/blog/posts/BLOG_ID
+   (Copy the number at end of URL)
+
+3. Get OAuth Access Token:
+   Follow "HOW TO GET BLOGGER ACCESS TOKEN" section above
+
+4. Update Supabase Database:
+   INSERT INTO system_config VALUES:
+   - blogger_blog_id = your blog ID
+   - blogger_api_key = your access token
+
+5. Verify Setup:
+   Test endpoints in debug section
+   Check logs for errors
+
+6. Deploy:
+   Push to GitHub → Auto-deploys via Vercel
+
+================================================================================
+TROUBLESHOOTING
+================================================================================
+
+Blogger Publishing Fails:
+  └─ Check: blogger_api_key is valid access token
+  └─ Check: blogger_blog_id is correct
+  └─ Token expired? Get new one from OAuth Playground
+  └─ Run: /api/debug/blogger-test for detailed error
+
+Cron Jobs Not Running:
+  └─ Check: CRON_SECRET matches in Vercel Crons settings
+  └─ Check: Authorization header includes "Bearer SECRET"
+  └─ Check: Endpoint URL is correct
+  └─ View: Dashboard → Logs tab for execution history
+
+AI Enrichment Fails:
+  └─ Check: OPENROUTER_API_KEY in Vercel env vars
+  └─ Check: Account has remaining credits
+  └─ Key format: starts with "sk-or-v1-"
+
+================================================================================
+KEY FACTS
+================================================================================
+
+✓ NO NextAuth.js - Uses direct Google OAuth2 tokens
+✓ NO Callback Routes - Token storage model eliminates need
+✓ NO /api/oauth/callback - Not required for this architecture
+✓ Direct API Calls - Blogger API called directly with stored token
+✓ Database Driven - Configuration stored in Supabase system_config
+✓ Simple Deployment - Minimal infrastructure needed
+
+================================================================================
+SUMMARY TABLE
+================================================================================
+
+| Item | Type | Storage | Example |
+|------|------|---------|---------|
+| Supabase Auth | API Key | Vercel env | eyJhbGc... |
+| Blogger Auth | OAuth Token | Database | ya29.xxx... |
+| OpenRouter | API Key | Vercel env | sk-or-v1-... |
+| Cron Secret | Token | Vercel env | abc123xyz... |
+| Blog ID | String | Database | 1234567890 |
+| AI Model | String | Database | openrouter/auto |
+
+================================================================================
+READY TO DEPLOY? ✓
+================================================================================
+
+When all checklist items are complete:
+1. Commit changes
+2. Push to main/deployment branch
+3. Vercel auto-deploys
+4. Visit dashboard to verify articles are processing
+5. Check Blogger blog for new posts
+6. Monitor cron logs for issues
+
+Contact Support: Check debug endpoints for detailed error messages
+================================================================================
